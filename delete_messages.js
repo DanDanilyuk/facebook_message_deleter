@@ -5,13 +5,13 @@ divElement.style.cssText =
 
 const h2Element = document.createElement('h2');
 h2Element.style.cssText =
-  'text-align:center; color:white; font-size:18px; font-weight:500; margin:0; margin-top:17px;';
+  'text-align:center; color:white; font-size:18px; font-weight:500; margin:0; margin-top:16px;';
 h2Element.textContent = 'Detecting Messages...';
 
 const buttonElement = document.createElement('button');
 buttonElement.id = 'btnclose';
 buttonElement.style.cssText =
-  'float:right; margin-right:40px; cursor:pointer; background-color:#d9534f; color:white; border:1px solid maroon; margin-top:-25px; border-radius:5px; padding:4px; font-size:15px;';
+  'float:right; margin-right:40px; cursor:pointer; background-color:#d9534f; color:white; border:1px solid maroon; margin-top:-27px; border-radius:5px; padding:4px; font-size:15px;';
 buttonElement.textContent = 'STOP';
 
 divElement.append(h2Element, buttonElement);
@@ -31,6 +31,7 @@ function deletefbmessage() {
     .filter(Boolean);
 
   if (!elms.length) {
+    document.getElementById('btnclose').remove();
     h2Element.textContent = `Delete Finished. ${dm} Messages were Deleted.`;
     return;
   }
