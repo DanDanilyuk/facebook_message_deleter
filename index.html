@@ -60,8 +60,17 @@
 
 <body>
   <h1>Facebook Message Deleter</h1>
-  <p>For more information, visit the <a href="https://github.com/DanDanilyuk/facebook_message_deleter"
-      target="_blank">GitHub repository</a>.</p>
+  <div class="center">
+    <h3>Instructions</h3>
+    <p>To delete all messages from a Facebook conversation, follow these steps:</p>
+    <ol style="list-style-position: inside;">
+      <li>Open the conversation in Facebook Messenger</li>
+      <li>Scroll to the top of the conversation</li>
+      <li>Open the developer console in your browser</li>
+      <li>Paste the code below into the console and press Enter</li>
+    </ol>
+  </div>
+
 
   <button class="center" onclick="copyToClipboard()">Copy to Clipboard</button>
   <div class="checkbox-container">
@@ -81,6 +90,9 @@
       }
     </script>
   </pre>
+
+  <p>For more information, visit the <a href="https://github.com/DanDanilyuk/facebook_message_deleter"
+      target="_blank">GitHub repository</a>.</p>
 
   <script>
     function copyToClipboard() {
