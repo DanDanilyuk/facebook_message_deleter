@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Facebook Message Deleter</title>
+  <style>
+    #content {
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Facebook Message Deleter</h1>
+  <p>For more information, visit the <a href="https://github.com/DanDanilyuk/facebook_message_deleter"
+      target="_blank">GitHub repository</a>.</p>
+
+  <button onclick="copyToClipboard()">Copy to Clipboard</button>
+  <input type="checkbox" id="showCode" onclick="toggleCode()"> Show Code
+  <pre id="content" style="display: none">
+    <script>
+      window.onload = function () {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', 'delete_messages_min.js', true);
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState == 4 && xhr.status == 200) {
+            document.getElementById('content').textContent = xhr.responseText;
+          }
+        }
+        xhr.send();
+      }
+    </script>
+  </pre>
+
+  <script>
+    function copyToClipboard() {
+      var content = document.getElementById('content').textContent;
+      navigator.clipboard.writeText(content).then(function () {
+        console.log('Copying to clipboard was successful!');
+      }, function (err) {
+        console.error('Could not copy text: ', err);
+      });
+    }
+
+    function toggleCode() {
+      var content = document.getElementById('content');
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+      } else {
+        content.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+
+</html>
