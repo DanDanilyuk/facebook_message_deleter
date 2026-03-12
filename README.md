@@ -1,16 +1,21 @@
-# Delete Facebook Messages
+# Facebook Message Deleter
 
-This script allows you to delete all your Facebook messages with just a few clicks. It works by clicking the "Delete" button for each message and then confirming the deletion.
+Bulk-delete your Facebook Messenger conversations from the browser console. No extensions, no installs - just paste and go.
 
-## How to use
+## Quick Start
 
-1. Go to your Facebook messages page.
-2. Scroll to the bottom of the page to load all your messages.
-3. Open the browser console by pressing `Ctrl + Shift + J` (Windows/Linux) or `Cmd + Option + J` (Mac).
-4. Copy the contents of `delete_messages.js` or `delete_messages.min.js` file and paste it into the console and press Enter.
+1. Open [facebook.com/messages](https://www.facebook.com/messages) in your browser.
+2. Press `Ctrl + Shift + J` (Windows/Linux) or `Cmd + Option + J` (Mac) to open the console.
+3. Paste the contents of `delete_messages.js` and press Enter.
 
-Note: You can find the `delete_messages.js` or `delete_messages.min.js` file in the same directory where you found this README.md file.
+The script will show a blue status bar at the top of the page with a STOP button. It deletes up to 50 conversations per run to avoid Facebook rate-limiting.
+
+You can also copy the script directly from the [GitHub Pages site](https://dandanilyuk.github.io/facebook_message_deleter/).
+
+## How It Works
+
+The script clicks through each conversation's menu, selects "Delete", and confirms the dialog - the same steps you'd do manually, just automated. It waits for Facebook to lazy-load more conversations before finishing.
 
 ## Disclaimer
 
-This script is provided as-is and is not affiliated with Facebook in any way. Use at your own risk.
+This script is provided as-is and is not affiliated with Facebook. Use at your own risk.
