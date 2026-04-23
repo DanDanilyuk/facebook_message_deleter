@@ -1,19 +1,39 @@
 (async function () {
   const LIMIT = 50;
-  const MAX_RETRIES = 3;
-  let deleted = 0;
-  let skipped = 0;
-  let stopped = false;
 
+  const SEL = {
+    row: 'div[role="row"]',
+    rowLink: 'a[href*="messages/t/"]',
+    menuBtn: ['[aria-label^="More options"]', '[aria-label^="Menu"]'],
+    menuItem: '[role="menuitem"]',
+    deleteText: /^\s*delete\b/i,
+    dialog: '[role="dialog"][aria-label*="Delete"]',
+    confirm: [
+      '[role="button"][aria-label*="Delete"]:not([aria-disabled="true"])[tabindex="0"]',
+      '[role="button"][aria-label*="Delete"]:not([aria-disabled="true"])',
+    ],
+  };
+
+  const handled = new WeakSet();
+  let deleted = 0, skipped = 0, stopped = false;
   const ui = setupUI();
 
-  async function waitFor(fn, timeout = 3000) {
-    const start = Date.now();
-    while (Date.now() - start < timeout) {
-      const result = fn();
-      if (result) return result;
-      await new Promise(r => setTimeout(r, 50));
-    }
+  function waitFor(check, timeoutMs = 3000) {
+    const r = check();
+    if (r) return Promise.resolve(r);
+    return new Promise((resolve) => {
+      const done = (v) => { observer.disconnect(); clearTimeout(timer); resolve(v); };
+      const observer = new MutationObserver(() => {
+        const r = check();
+        if (r) done(r);
+      });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      const timer = setTimeout(() => done(null), timeoutMs);
+    });
+  }
+
+  function pick(sels, root = document) {
+    for (const s of sels) { const el = root.querySelector(s); if (el) return el; }
     return null;
   }
 
@@ -22,118 +42,81 @@
     await waitFor(() => !document.querySelector('[role="menu"]') && !document.querySelector('[role="dialog"]'));
   }
 
-  function skip(row, reason, debug) {
-    console.warn(`Skipping row - ${reason}:`, debug);
-    row.style.display = 'none';
-    skipped++;
+  function findRow() {
+    for (const link of document.querySelectorAll(`${SEL.row} ${SEL.rowLink}`)) {
+      const row = link.closest(SEL.row);
+      if (row && !handled.has(row)) return row;
+    }
+    return null;
   }
 
-  const retries = new WeakMap();
+  async function deleteOne(row) {
+    const menuBtn = await waitFor(() => pick(SEL.menuBtn, row));
+    if (!menuBtn) return false;
+    menuBtn.click();
 
-  function retry(row) {
-    const n = (retries.get(row) || 0) + 1;
-    retries.set(row, n);
-    return n >= MAX_RETRIES;
+    const item = await waitFor(() =>
+      [...document.querySelectorAll(SEL.menuItem)].find(el => SEL.deleteText.test(el.textContent.trim())));
+    if (!item) { await dismiss(); return false; }
+    item.click();
+
+    const btn = await waitFor(() => {
+      const d = document.querySelector(SEL.dialog);
+      return d ? pick(SEL.confirm, d) : null;
+    });
+    if (!btn) { await dismiss(); return false; }
+    btn.click();
+    await waitFor(() => !document.querySelector(SEL.dialog));
+    return true;
+  }
+
+  function counts() {
+    return `${deleted} / ${LIMIT} deleted` + (skipped ? `  -  ${skipped} skipped` : '');
   }
 
   while (!stopped) {
     if (deleted >= LIMIT) {
-      ui.status(`Deleted ${deleted} / ${LIMIT}. Limit reached.`, '#e6b800');
-      alert(`${deleted} messages deleted. Please reload to avoid temporary bans.`);
+      ui.status(`Deleted ${deleted} / ${LIMIT}. Reload before running again to avoid temporary bans.`, '#e6b800');
       break;
     }
-
-    const row = [...document.querySelectorAll('div[role="row"] a[href*="messages/t/"]')]
-      .map(el => el.closest('div[role="row"]'))
-      .filter(Boolean)[0];
-
+    let row = findRow();
     if (!row) {
-      ui.status(`Waiting for more messages...`);
-      const newRow = await waitFor(
-        () => document.querySelector('div[role="row"] a[href*="messages/t/"]'),
-        5000,
-      );
-      if (!newRow) {
-        ui.status(`Finished. Deleted ${deleted}.` + (skipped ? ` (${skipped} skipped)` : ''));
-        break;
-      }
-      continue;
+      ui.status('Waiting for more messages...');
+      row = await waitFor(findRow, 5000);
+      if (!row) { ui.status(`Finished. ${counts()}`); break; }
     }
-
-    try {
-      const menuBtn = await waitFor(() =>
-        row.querySelector('[aria-label^="More options"]') ||
-        row.querySelector('[aria-label="Menu"]'),
-      );
-      if (!menuBtn) {
-        if (retry(row)) skip(row, 'menu button not found', [...row.querySelectorAll('[aria-label]')].map(el => el.getAttribute('aria-label')));
-        continue;
-      }
-      menuBtn.click();
-
-      const deleteOption = await waitFor(() =>
-        [...document.querySelectorAll('[role="menuitem"]')].find(el => /delete/i.test(el.textContent)),
-      );
-      if (!deleteOption) {
-        await dismiss();
-        if (retry(row)) skip(row, 'delete option not found', [...document.querySelectorAll('[role="menuitem"]')].map(el => el.textContent.trim()));
-        continue;
-      }
-      deleteOption.click();
-
-      const confirmBtn = await waitFor(() =>
-        document.querySelector(
-          '[role="dialog"][aria-label*="Delete"] [role="button"][aria-label*="Delete"]:not([aria-disabled="true"])[tabindex="0"]',
-        ),
-      );
-      if (!confirmBtn) {
-        await dismiss();
-        if (retry(row)) skip(row, 'confirm button not found', [...document.querySelectorAll('[role="dialog"]')].map(el => el.getAttribute('aria-label')));
-        continue;
-      }
-
-      confirmBtn.click();
-      await waitFor(() => !document.querySelector('[role="dialog"][aria-label*="Delete"]'));
+    handled.add(row);
+    if (await deleteOne(row)) {
       deleted++;
-      ui.status(`Deleted ${deleted} / ${LIMIT}...`);
-    } catch (err) {
-      console.error('Error during deletion:', err);
-      await dismiss();
-      row.style.display = 'none';
+      ui.status(`Deleting messages...  ${counts()}`);
+    } else {
       skipped++;
+      console.warn('[fb-delete] skipped row');
     }
   }
 
-  if (stopped) {
-    await dismiss();
-    ui.status(`Stopped. Deleted ${deleted}.` + (skipped ? ` (${skipped} skipped)` : ''), '#e6b800');
-    ui.stop.textContent = 'Close';
-    ui.stop.onclick = () => ui.bar.remove();
-  }
+  await dismiss();
+  if (stopped) ui.status(`Stopped. ${counts()}`, '#e6b800');
+  ui.toClose();
 
   function setupUI() {
     const old = document.getElementById('ird');
     if (old) old.remove();
-
     const bar = document.createElement('div');
     bar.id = 'ird';
-    bar.style.cssText = 'position:fixed;width:100%;top:0;left:0;background:#4267B2;color:white;z-index:99999999999999;height:55px;font-family:sans-serif;display:flex;align-items:center;justify-content:center;';
-
+    bar.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:48px;background:#4267B2;color:white;z-index:99999999999999;font-family:sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.15);';
     const h2 = document.createElement('h2');
-    h2.style.cssText = 'color:white;font-size:18px;font-weight:500;margin:0;';
-    h2.textContent = 'Detecting Messages...';
-
-    const stop = document.createElement('button');
-    stop.style.cssText = 'cursor:pointer;background:#d9534f;color:white;border:1px solid maroon;border-radius:5px;padding:6px 12px;font-size:15px;margin-left:20px;';
-    stop.textContent = 'STOP';
-    stop.onclick = () => { stopped = true; };
-
-    bar.append(h2, stop);
+    h2.style.cssText = 'color:white;font-size:16px;font-weight:500;margin:0;';
+    h2.textContent = 'Detecting messages...';
+    const stopBtn = document.createElement('button');
+    stopBtn.style.cssText = 'cursor:pointer;background:#d9534f;color:white;border:1px solid maroon;border-radius:5px;padding:6px 12px;font-size:14px;margin-left:20px;';
+    stopBtn.textContent = 'STOP';
+    stopBtn.onclick = () => { stopped = true; };
+    bar.append(h2, stopBtn);
     document.body.prepend(bar);
-
     return {
-      bar, stop,
       status(msg, color) { h2.textContent = msg; if (color) bar.style.backgroundColor = color; },
+      toClose() { stopBtn.textContent = 'Close'; stopBtn.onclick = () => bar.remove(); },
     };
   }
 })();
